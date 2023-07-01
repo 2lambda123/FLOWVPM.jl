@@ -51,6 +51,56 @@ function run_vpm!(pfield::ParticleField, dt::Real, nsteps::Int;
                       verbose::Bool=true, verbose_nsteps::Int=10, v_lvl::Int=0,
                       save_time=true)
 
+    (line1, line2, run_id, file_verbose, vprintln, time_beg) =
+    initialize_vpm!(pfield, dt, nsteps;
+                    runtime_function=runtime_function,
+                    static_particles_function=static_particles_function,
+                    save_path=save_path,
+                    create_savepath=create_savepath,
+                    run_name=run_name,
+                    save_code=save_code,
+                    nsteps_save=nsteps_save, prompt=prompt,
+                    verbose=verbose, verbose_nsteps=verbose_nsteps, v_lvl=v_lvl,
+                    save_time=save_time)
+
+    # RUN
+    for i in 0:nsteps
+        breakflag = step_vpm!(i, pfield, dt, nsteps;
+                              runtime_function=runtime_function,
+                              static_particles_function=static_particles_function,
+                              save_path=save_path,
+                              create_savepath=create_savepath,
+                              run_name=run_name,
+                              save_code=save_code,
+                              nsteps_save=nsteps_save, prompt=prompt,
+                              verbose=verbose, verbose_nsteps=verbose_nsteps, v_lvl=v_lvl,
+                              save_time=save_time, vprintln=vprintln)
+
+        # User-indicated end of simulation
+        if breakflag
+            break
+        end
+    end
+
+    # Finalize verbose
+    finalize_verbose(time_beg, line1, vprintln, run_id, v_lvl)
+
+    return nothing
+end
+
+function initialize_vpm!(pfield::ParticleField, dt::Real, nsteps::Int;
+                          # RUNTIME OPTIONS
+                          runtime_function::Function=runtime_default,
+                          static_particles_function::Function=static_particles_default,
+                          # OUTPUT OPTIONS
+                          save_path::Union{Nothing, String}=nothing,
+                          create_savepath::Bool=true,
+                          run_name::String="pfield",
+                          save_code::String="",
+                          nsteps_save::Int=1, prompt::Bool=true,
+                          verbose::Bool=true, verbose_nsteps::Int=10, v_lvl::Int=0,
+                          save_time=true)
+
     # ERROR CASES
     ## Check that viscous scheme and kernel are compatible
     compatible_kernels = _kernel_compatibility[typeof(pfield.viscous).name]
@@ -81,60 +131,65 @@ function run_vpm!(pfield::ParticleField, dt::Real, nsteps::Int;
                                                     runtime_function,
                                                     static_particles_function, v_lvl)
 
-    # RUN
-    for i in 0:nsteps
+    return (line1, line2, run_id, file_verbose, vprintln, time_beg)
+end
 
-        if i%verbose_nsteps==0
-            vprintln("Time step $i out of $nsteps\tParticles: $(get_np(pfield))", v_lvl+1)
-        end
+function step_vpm!(i::Int, pfield::ParticleField, dt::Real, nsteps::Int;
+                          # RUNTIME OPTIONS
+                          runtime_function::Function=runtime_default,
+                          static_particles_function::Function=static_particles_default,
+                          # OUTPUT OPTIONS
+                          save_path::Union{Nothing, String}=nothing,
+                          create_savepath::Bool=true,
+                          run_name::String="pfield",
+                          save_code::String="",
+                          nsteps_save::Int=1, prompt::Bool=true,
+                          verbose::Bool=true, verbose_nsteps::Int=10, v_lvl::Int=0,
+                          save_time=true, vprintln::Function=vprintln)
 
-        # Relaxation step
-        relax = pfield.relaxation != relaxation_none &&
-                pfield.relaxation.nsteps_relax >= 1 &&
-                i>0 && (i%pfield.relaxation.nsteps_relax == 0)
 
-        org_np = get_np(pfield)
-
-        # Time step
-        if i!=0
-            # Add static particles
-            remove = static_particles_function(pfield, pfield.t, dt)
-
-            # Step in time solving governing equations
-            nextstep(pfield, dt; relax=relax)
-
-            # Remove static particles (assumes particles remained sorted)
-            if remove==nothing || remove
-                for pi in get_np(pfield):-1:(org_np+1)
-                    remove_particle(pfield, pi)
-                end
-            end
-        end
-
-        # Calls user-defined runtime function
-        breakflag = runtime_function(pfield, pfield.t, dt;
-                                     vprintln= (str)-> i%verbose_nsteps==0 ?
-                                            vprintln(str, v_lvl+2) : nothing)
-
-        # Save particle field
-        if save_path!=nothing && (i%nsteps_save==0 || i==nsteps || breakflag)
-            overwrite_time = save_time ? nothing : pfield.nt
-            save(pfield, run_name; path=save_path, add_num=true,
-                                        overwrite_time=overwrite_time)
-        end
-
-        # User-indicated end of simulation
-        if breakflag
-            break
-        end
-
+    if i%verbose_nsteps==0
+        vprintln("Time step $i out of $nsteps\tParticles: $(get_np(pfield))", v_lvl+1)
     end
 
-    # Finalize verbose
-    finalize_verbose(time_beg, line1, vprintln, run_id, v_lvl)
+    # Relaxation step
+    relax = pfield.relaxation != relaxation_none &&
+    pfield.relaxation.nsteps_relax >= 1 &&
+    i>0 && (i%pfield.relaxation.nsteps_relax == 0)
 
-    return nothing
+    org_np = get_np(pfield)
+
+    # Time step
+    if i!=0
+        # Add static particles
+        remove = static_particles_function(pfield, pfield.t, dt)
+
+        # Step in time solving governing equations
+        nextstep(pfield, dt; relax=relax)
+
+        # Remove static particles (assumes particles remained sorted)
+        if remove==nothing || remove
+            for pi in get_np(pfield):-1:(org_np+1)
+                remove_particle(pfield, pi)
+            end
+        end
+    end
+
+    # Calls user-defined runtime function
+    breakflag = runtime_function(pfield, pfield.t, dt;
+                                 vprintln= (str)-> i%verbose_nsteps==0 ?
+                                 vprintln(str, v_lvl+2) : nothing)
+
+    # Save particle field
+    if save_path!=nothing && (i%nsteps_save==0 || i==nsteps || breakflag)
+        overwrite_time = save_time ? nothing : pfield.nt
+        save(pfield, run_name; path=save_path, add_num=true,
+             overwrite_time=overwrite_time)
+    end
+
+    return breakflag
 end
+
 
 """
   `save(pfield, file_name; path="")`
