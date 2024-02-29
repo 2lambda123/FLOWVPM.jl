@@ -1,0 +1,32 @@
+repo_name: 2lambda123/FLOWVPM.jl
+report_id: 2940570a47589bd2958e2967388b2179
+version: 0.1
+repo_type: Public
+timestamp: '2024-02-29T19:14:28+00:00'
+requested_by: EdoAlvarezR
+provider: github
+branch: master
+detected_tools_count: 2
+tools:
+- name: Git
+  description: Fast, scalable, distributed revision control system
+  website_url: http://git-scm.com/
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Version Control System
+  image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/2lambda123/FLOWVPM.jl
+  detection_source: Repo Metadata
+- name: Julia
+  description: A high-level, high-performance dynamic programming language for technical
+    computing
+  website_url: http://pkg.julialang.org/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Package Managers
+  image_url: https://img.stackshare.io/package_manager/3914/default_a30825f60d1159a8bca0d7d45c4988f63eeb2b0f.png
+  detection_source_url: https://github.com/2lambda123/FLOWVPM.jl
+  detection_source: Repo Metadata
